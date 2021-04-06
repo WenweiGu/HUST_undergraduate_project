@@ -2,12 +2,26 @@ from utils.utils import create_directory
 from utils.utils import read_dataset
 from utils.utils import transform_to_same_length
 import numpy as np
+import pandas as pd
 import sklearn
 import random
+import os
 
 
 def fit_classifier(dataset, dataset_list=None):
     dataset_dict = read_dataset(root_dir, dataset)
+    x_train_origin = dataset_dict[dataset][0]
+    y_train_origin = dataset_dict[dataset][1]
+    x_test_origin = dataset_dict[dataset][2]
+    y_test_origin = dataset_dict[dataset][3]
+
+    x_train_origin = x_train_origin.reshape((x_train_origin.shape[0], x_train_origin.shape[1], 1))
+    x_test_origin = x_test_origin.reshape((x_test_origin.shape[0], x_test_origin.shape[1], 1))
+
+    enc = sklearn.preprocessing.OneHotEncoder(categories='auto')
+    enc.fit(np.concatenate((y_train_origin, y_test_origin), axis=0).reshape(-1, 1))
+    y_train_origin = enc.transform(y_train_origin.reshape(-1, 1)).toarray()
+
     x_train = dataset_dict[dataset][0]
     y_train = dataset_dict[dataset][1]
     x_test = dataset_dict[dataset][2]
@@ -54,8 +68,13 @@ def fit_classifier(dataset, dataset_list=None):
 
     y_true = np.argmax(y_test, axis=1)
 
+    input_shape_origin = x_train_origin.shape[1:]
     input_shape = x_train.shape[1:]
-    classifier = create_classifier(classifier_name, input_shape, nb_classes, output_directory, y_true, False)
+    classifier_origin = create_classifier(classifier_name, input_shape_origin, nb_classes, output_directory, y_true,
+                                          False)[0]
+    classifier_origin.fit_model(x_train_origin, y_train_origin, x_test_origin)
+
+    classifier = create_classifier(classifier_name, input_shape, nb_classes, output_directory, y_true, False)[1]
     classifier.fit_pretrain_model(x_pretrain)
     classifier.fit_model(x_train, y_train, x_test)
 
@@ -63,7 +82,9 @@ def fit_classifier(dataset, dataset_list=None):
 def create_classifier(classifier, input_shape, nb_classes, output_dir, y_test, verbose=False):
     if classifier == 'fcn':
         from classifiers import fcn
-        return fcn.Classifier_FCN(output_dir, input_shape, nb_classes, y_test)
+        model_origin = fcn.Classifier_FCN_origin(output_dir, input_shape, nb_classes, y_test)
+        model = fcn.Classifier_FCN(output_dir, input_shape, nb_classes, y_test)
+        return model_origin, model
     if classifier == 'resnet':
         from classifiers import resnet
         return resnet.Classifier_RESNET(output_dir, input_shape, nb_classes, verbose)
@@ -102,21 +123,26 @@ def data_augmentation(augment_sample_number, x_train, y_train):
 root_dir = './UCR'
 
 # this is the code used to launch an experiment on a dataset
-data_name_list = ['Beef', 'BeetleFly', 'BirdChicken', 'BME', 'Car', 'CBF', 'Chinatown',
-                  'ChlorineConcentration', 'CinCECGTorso', 'Coffee']
-
-dataset_name = 'Beef'
+dataset_name = 'Coffee'
 classifier_name = 'fcn'
+data_name_list = ['ACSF1', 'Adiac',
+                  'ChlorineConcentration', 'CinCECGTorso', 'Coffee', 'Computers', 'CricketX',
+                  'Herring']
 
 output_directory = root_dir + '/results/' + classifier_name + '/' + \
                    dataset_name + '/'
 
 test_dir_df_metrics = output_directory + 'df_metrics.csv'
 
+if os.path.exists(test_dir_df_metrics):
+    csv = pd.read_csv(test_dir_df_metrics)
+    os.remove(test_dir_df_metrics)
+
 print('Method: ', dataset_name, classifier_name)
 
 create_directory(output_directory)
 
+# feed single dataset
 fit_classifier(dataset_name, data_name_list)
 
 print('DONE')

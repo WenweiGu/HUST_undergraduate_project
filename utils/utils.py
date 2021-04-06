@@ -130,7 +130,7 @@ def save_logs(output_directory, hist, y_pred, y_true, duration, lr=True):
     hist_df.to_csv(output_directory + 'history.csv', index=False)
 
     df_metrics = calculate_metrics(y_pred, y_true, duration)
-    df_metrics.to_csv(output_directory + 'df_metrics.csv', index=False)
+    df_metrics.to_csv(output_directory + 'df_metrics.csv', mode='a', index=False)
 
     index_best_model = hist_df['loss'].idxmin()
     row_best_model = hist_df.loc[index_best_model]
